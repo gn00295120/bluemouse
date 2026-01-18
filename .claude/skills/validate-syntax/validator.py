@@ -85,7 +85,7 @@ def validate_l3_indentation(code: str) -> Dict:
         if '\t' in line:
             issues.append(f"Line {i}: 使用 Tab 而非空格")
 
-        if line and not line.lstrip():
+        if not line or not line.strip():
             continue
         leading_spaces = len(line) - len(line.lstrip())
         if leading_spaces % 4 != 0:
@@ -134,7 +134,7 @@ def validate_l4_naming_convention(code: str) -> Dict:
             return {
                 "layer": 4,
                 "name": "命名規範檢查",
-                "passed": len(issues) == 0,
+                "passed": False,
                 "message": f"發現 {len(issues)} 個命名問題",
                 "issues": issues[:3]
             }

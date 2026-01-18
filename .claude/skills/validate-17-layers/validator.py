@@ -140,7 +140,7 @@ def validate_l3_indentation(code: str) -> Dict:
         if '\t' in line:
             issues.append(f"Line {i}: 使用 Tab 而非空格")
 
-        if line and not line.lstrip():
+        if not line or not line.strip():
             continue
         leading_spaces = len(line) - len(line.lstrip())
         if leading_spaces % 4 != 0:
@@ -189,7 +189,7 @@ def validate_l4_naming_convention(code: str) -> Dict:
             return {
                 "layer": 4,
                 "name": "命名規範檢查",
-                "passed": len(issues) == 0,
+                "passed": False,
                 "message": f"發現 {len(issues)} 個命名問題",
                 "issues": issues[:3]
             }
@@ -442,7 +442,9 @@ def validate_l10_stdlib(code: str) -> Dict:
                 if node.module:
                     import_names.append(node.module.split('.')[0])
 
-        stdlib = {'os', 'sys', 'json', 're', 'datetime', 'typing', 'asyncio', 'time', 'math', 'hashlib'}
+        stdlib = {'os', 'sys', 'json', 're', 'datetime', 'typing', 'asyncio', 'time', 'math', 'hashlib',
+                  'collections', 'functools', 'itertools', 'pathlib', 'subprocess', 'threading',
+                  'multiprocessing', 'logging', 'unittest', 'argparse', 'copy', 'io', 'tempfile'}
         used = [name for name in import_names if name in stdlib]
 
         return {
@@ -457,7 +459,9 @@ def validate_l10_stdlib(code: str) -> Dict:
 
 def validate_l11_third_party(code: str) -> Dict:
     """L11: 第三方庫檢查"""
-    third_party = {'django', 'flask', 'fastapi', 'requests', 'numpy', 'pandas'}
+    third_party = {'django', 'flask', 'fastapi', 'requests', 'numpy', 'pandas',
+                   'pytest', 'aiohttp', 'sqlalchemy', 'pydantic', 'httpx', 'redis',
+                   'celery', 'boto3', 'tensorflow', 'torch', 'scikit-learn'}
 
     used_third_party = []
     for module in third_party:
@@ -605,10 +609,10 @@ def validate_l16_security(code: str) -> Dict:
                 elif isinstance(node.func, ast.Attribute):
                     func_name = node.func.attr
 
-                if func_name in ['eval', 'exec', 'pickle']:
+                if func_name in ['eval', 'exec', 'compile', '__import__']:
                     issues.append(f"使用了危險函數: {func_name}")
 
-        secret_patterns = [r'api_key\s*=\s*[\'"][^\s*]{10,}[\'"]', r'password\s*=\s*[\'"][^\s*]{8,}[\'"]']
+        secret_patterns = [r'api_key\s*=\s*[\'"][^\s\'"]{10,}[\'"]', r'password\s*=\s*[\'"][^\s\'"]{8,}[\'"]']
         for pattern in secret_patterns:
             if re.search(pattern, code, re.IGNORECASE):
                 issues.append("檢測到可能的寫死密鑰或密碼")
@@ -629,20 +633,23 @@ def validate_l17_performance(code: str) -> Dict:
     """L17: 性能檢查 (深度循環分析)"""
     try:
         tree = ast.parse(code)
-        max_depth = 0
 
+        def get_loop_depth(node, current_depth=0):
+            """遞歸計算循環嵌套深度"""
+            max_depth = current_depth
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, (ast.For, ast.While)):
+                    child_depth = get_loop_depth(child, current_depth + 1)
+                    max_depth = max(max_depth, child_depth)
+                else:
+                    child_depth = get_loop_depth(child, current_depth)
+                    max_depth = max(max_depth, child_depth)
+            return max_depth
+
+        max_depth = 0
         for node in ast.walk(tree):
             if isinstance(node, (ast.For, ast.While)):
-                depth = 1
-                curr = node
-                while any(isinstance(child, (ast.For, ast.While)) for child in ast.iter_child_nodes(curr)):
-                    depth += 1
-                    for child in ast.iter_child_nodes(curr):
-                        if isinstance(child, (ast.For, ast.While)):
-                            curr = child
-                            break
-                    if depth > 5:
-                        break
+                depth = get_loop_depth(node, 1)
                 max_depth = max(max_depth, depth)
 
         if max_depth >= 3:

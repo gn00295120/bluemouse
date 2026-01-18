@@ -95,7 +95,7 @@ for node in try_nodes:
 
 **Pass**: Has try-except AND `bad_handlers == 0` → `"檢測到 N 個有效錯誤處理塊"`
 **Fail**:
-- No try-except: `"建議添加 try-except 錯誤處理塊"`
+- No try-except: `"建議添加 try-except 錯誤處理塊"` (L15 視為失敗)
 - Bad handlers: `"發現 N 個空的或只有 pass 的錯誤處理塊 (Anti-pattern)"`
 
 **Examples**:
